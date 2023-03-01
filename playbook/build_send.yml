@@ -1,0 +1,61 @@
+---
+- hosts: build_host
+  gather_facts: no
+
+  vars_prompt:
+    - name: docker_image_name
+      prompt: Docker image name?
+      default: democontainer
+      private: false
+    - name: docker_image_tag
+      prompt: Docker image tag?
+      private: false
+
+  tasks:
+    - name: create a temp directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: .demo_build_docker
+      register: remote_dir
+    - name: debug remote_dir.path
+      ansible.builtin.debug:
+        var: remote_dir.path
+    - name: copy Dockerfile
+      ansible.builtin.copy:
+        src: ../Dockerfile
+        dest: "{{ remote_dir.path }}/Dockerfile" # change to a valid remote location
+        mode: '0644'
+    - name: install docker SDK for Python
+      ansible.builtin.pip:
+        name: docker
+    - name: build Docker image
+      community.general.docker_image:
+        build:
+          path: "{{ remote_dir.path }}" # change to a valid remote location
+        name: "{{ docker_image_name }}"
+        tag: "{{ docker_image_tag }}"
+        push: false
+        source: build
+    - name: Archive Docker image
+      community.general.docker_image:
+        name: "{{ docker_image_name }}"
+        tag: "{{ docker_image_tag }}"
+        archive_path: "{{ remote_dir.path }}/{{ docker_image_name }}.{{ docker_image_tag }}.tar"
+        source: local
+    - name: simulate FTP send
+      ansible.builtin.debug:
+        msg: "Send [{{ remote_dir.path }}/{{ docker_image_name }}.{{ docker_image_tag }}.tar] via FTP"
+    - name: Delete docker image
+      community.general.docker_image:
+        state: absent
+        name: "{{ docker_image_name }}"
+        tag: "{{ docker_image_tag }}"
+    - name: Find /tmp/ansible files equal or greater than 10 megabytes ending with .old or .log.gz via regex
+      ansible.builtin.find:
+        paths: "{{ remote_dir.path }}"
+        patterns: '^.*?\.tar$'
+        use_regex: yes
+    - name: Recursively remove directory
+      ansible.builtin.file:
+        path: "{{ remote_dir.path }}"
+        state: absent
