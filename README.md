@@ -5,11 +5,6 @@
 sudo dnf install ansible
 ```
 
-* Docker SDK for Python
-```shell
-pip install docker
-```
-
 ## Configuration
 define `owner`/`group` in `playbook/build.yml`
 
